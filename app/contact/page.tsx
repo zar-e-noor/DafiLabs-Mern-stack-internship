@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, FormEvent } from "react";
 import { Button } from "@/components/Button";
 import { FadeInView } from "@/components/FadeInView";
 import { FormInput } from "@/components/FormInput";
@@ -7,18 +8,22 @@ import { PageHeader } from "@/components/PageHeader";
 import { Section } from "@/components/Section";
 import { TextArea } from "@/components/TextArea";
 import { content } from "@/data/content";
-import { FormEvent, useState } from "react";
+// Fix: Correct import path for server action
+import { submitContactForm } from "@/lib/action";
 
 interface FormData {
   name: string;
   email: string;
+  subject: string;
   message: string;
 }
 
 interface FormErrors {
   name?: string;
   email?: string;
+  subject?: string;
   message?: string;
+  submit?: string;
 }
 
 function validate(data: FormData): FormErrors {
@@ -47,6 +52,7 @@ export default function ContactPage() {
   const [formData, setFormData] = useState<FormData>({
     name: "",
     email: "",
+    subject: "",
     message: "",
   });
   const [errors, setErrors] = useState<FormErrors>({});
@@ -71,12 +77,36 @@ export default function ContactPage() {
 
     setLoading(true);
 
-    // UI-only placeholder — replace with fetch('/api/contact', ...) in Task 4
-    await new Promise((resolve) => setTimeout(resolve, 1200));
+    try {
+      // Prepare data object for server action
+      const dataToSend = new FormData();
+      dataToSend.append("name", formData.name);
+      dataToSend.append("email", formData.email);
+      dataToSend.append("subject", formData.subject);
+      dataToSend.append("message", formData.message);
+      dataToSend.append("subject", ""); // Optional subject
 
-    setLoading(false);
-    setSubmitted(true);
-    setFormData({ name: "", email: "", message: "" });
+      const response = await submitContactForm(null, dataToSend);
+
+      if (response && response.success) {
+        setSubmitted(true);
+        setFormData({ name: "", email: "", subject: "", message: "" });
+        setErrors({});
+      } else {
+        setErrors((prev) => ({
+          ...prev,
+          submit: response?.error || "Failed to send message. Please try again.",
+        }));
+      }
+    } catch (err) {
+      console.error("Submission error:", err);
+      setErrors((prev) => ({
+        ...prev,
+        submit: "An unexpected error occurred.",
+      }));
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -114,6 +144,11 @@ export default function ContactPage() {
           </div>
         ) : (
           <form onSubmit={handleSubmit} noValidate className="space-y-6">
+            {errors.submit && (
+              <p className="text-sm font-medium text-red-600 dark:text-red-400 text-center">
+                {errors.submit}
+              </p>
+            )}
             <FormInput
               label="Name"
               name="name"
@@ -132,6 +167,13 @@ export default function ContactPage() {
               error={errors.email}
               placeholder="you@example.com"
               required
+            />
+            <FormInput
+              label="Subject"
+              name="subject"
+              value={formData.subject}
+              onChange={(e) => handleChange("subject", e.target.value)}
+              placeholder="Project Inquiry / Feedback..."
             />
             <TextArea
               label="Message"
