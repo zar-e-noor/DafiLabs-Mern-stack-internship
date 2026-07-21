@@ -1,6 +1,6 @@
 'use server';
 
-import { headers } from 'next/headers';
+import { headers, cookies } from 'next/headers';
 import { checkRateLimit, resetRateLimit } from '@/lib/rate-limit';
 import { supabase } from '@/lib/supabase';
 
@@ -79,6 +79,16 @@ export async function loginAction(prevState: any, formData: FormData) {
     };
   }
 
+   // ✅ Set the session cookie middleware checks for
+   const cookieStore = await cookies();
+   cookieStore.set('admin_session', data.session?.access_token ?? 'authenticated', {
+     httpOnly: true,
+     secure: process.env.NODE_ENV === 'production',
+     sameSite: 'lax',
+     path: '/',
+     maxAge: 60 * 60 * 8, // 8 hours
+   });
+   
   // Reset rate limiter count on success
   resetRateLimit(clientIp);
 
